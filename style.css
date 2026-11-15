@@ -1,10 +1,267 @@
-body{
-    height: 95vh;
-    width: 95vw;
+:root {
+    --fundo: #0b0f0b;
+    --texto: #e8f5e8;
+    --texto-suave: #9bb89b;
+    --borda: #2f5a2f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background-color:rgb(0, 0, 0);
-    color: rgb(42, 73, 42);
+    gap: 12px;
+    background-color: var(--fundo);
+    color: var(--texto);
+    font-family: "Courier New", monospace;
+}
+
+h1 {
+    margin: 0;
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.placar {
+    margin: 0;
+    font-size: 1.1rem;
+    text-align: center;
+}
+
+/* Escolha ou criação de jogador */
+.jogador {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(512px, 100%);
+}
+
+.linha-jogador {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.jogador label {
+    flex: 0 0 auto;
+    color: var(--texto-suave);
+    font-size: 0.9rem;
+}
+
+.jogador select,
+.jogador input {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 10px;
+    font: inherit;
+    color: var(--texto);
+    background-color: #1b3321;
+    border: 2px solid var(--borda);
+    border-radius: 8px;
+}
+
+.jogador input::placeholder {
+    color: var(--texto-suave);
+}
+
+.jogador select:disabled,
+.jogador input:disabled,
+.jogador button:disabled {
+    opacity: 0.5;
+}
+
+.adicionar {
+    min-height: 40px;
+    padding: 0 16px;
+    font: inherit;
+    color: var(--texto);
+    background-color: #1b3321;
+    border: 2px solid var(--borda);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.adicionar:hover:not(:disabled),
+.adicionar:active:not(:disabled) {
+    background-color: var(--borda);
+}
+
+:focus-visible {
+    outline: 2px solid #8cf0a3;
+    outline-offset: 2px;
+}
+
+/* Ranking */
+.ranking {
+    width: min(512px, 100%);
+}
+
+.ranking h2 {
+    margin: 8px 0 4px;
+    font-size: 1.2rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ranking .regra {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    color: var(--texto-suave);
+}
+
+.ranking .origem {
+    margin: 0 0 8px;
+    font-size: 0.8rem;
+    color: var(--texto-suave);
+}
+
+.ranking .origem[data-estado="compartilhado"] {
+    color: #8cf0a3;
+}
+
+.ranking .origem[data-estado="demora"],
+.ranking .origem[data-estado="leitura"],
+.ranking .origem[data-estado="falha"],
+.ranking .origem[data-estado="falhaescrita"] {
+    color: #ffd23f;
+}
+
+.tabela-rolagem {
+    overflow-x: auto;
+}
+
+.ranking table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranking th,
+.ranking td {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--borda);
+}
+
+.ranking th {
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--texto-suave);
+}
+
+.ranking th:nth-child(3),
+.ranking td:nth-child(3),
+.ranking th:nth-child(4),
+.ranking td:nth-child(4) {
+    text-align: right;
+}
+
+.ranking tr.atual td {
+    background-color: #1b3321;
+    color: #8cf0a3;
+}
+
+.ranking td.vazio {
+    color: var(--texto-suave);
+    text-align: center;
+}
+
+.ajuda {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--texto-suave);
+    text-align: center;
+}
+
+/* Controles na tela: só aparecem em telas de toque ou janelas estreitas */
+.painel-toque {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+@media (pointer: coarse), (max-width: 600px) {
+    .painel-toque {
+        display: flex;
+    }
+}
+
+.controles {
+    display: grid;
+    grid-template-columns: repeat(3, 72px);
+    grid-template-rows: repeat(2, 72px);
+    grid-template-areas:
+        ". cima ."
+        "esquerda baixo direita";
+    gap: 8px;
+}
+
+.cima { grid-area: cima; }
+.esquerda { grid-area: esquerda; }
+.baixo { grid-area: baixo; }
+.direita { grid-area: direita; }
+
+.seta,
+.acao {
+    font: inherit;
+    color: var(--texto);
+    background-color: #1b3321;
+    border: 2px solid var(--borda);
+    border-radius: 12px;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.seta {
+    font-size: 1.6rem;
+}
+
+.acao {
+    min-width: 224px;
+    height: 48px;
+    font-size: 1.1rem;
+}
+
+.seta:active,
+.acao:active {
+    background-color: var(--borda);
+}
+
+.rodape {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--texto-suave);
+    text-align: center;
+}
+
+.rodape a {
+    color: var(--texto);
+    text-decoration: underline;
+}
+
+.rodape a:hover,
+.rodape a:focus-visible {
+    color: #8cf0a3;
+}
+
+canvas {
+    width: 512px;
+    max-width: 100%;
+    height: auto;
+    border: 3px solid var(--borda);
+    border-radius: 6px;
+    touch-action: none; /* deslizar no canvas não rola a página */
 }
