@@ -3,13 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="description" content="Jogo da cobrinha com pedras, jogadores, ranking e controles para celular. Feito em HTML, CSS e JavaScript puro.">
     <title>Jogo da Cobrinha</title>
     <link rel="stylesheet" href="style.css">
     <script defer src="script.js"></script>
 </head>
 <body>
-    <h1>JOGO DA COBRINHA!!!</h1>
-    <canvas id="snake" width="512" height="512"></canvas>
+    <h1>Jogo da Cobrinha</h1>
+    <form id="form-jogador" class="jogador" autocomplete="off">
+        <div class="linha-jogador">
+            <label for="lista-jogadores">Jogador</label>
+            <select id="lista-jogadores"></select>
+        </div>
+        <div class="linha-jogador">
+            <input id="novo-jogador" type="text" maxlength="16" placeholder="Novo jogador" aria-label="Nome do novo jogador">
+            <button type="submit" id="botao-adicionar" class="adicionar">Adicionar</button>
+        </div>
+    </form>
+    <p class="placar">Pontos: <strong id="pontos">0</strong> · Tempo: <strong id="tempo">0:00,0</strong> · Recorde: <strong id="recorde">0</strong></p>
+    <canvas id="snake" width="512" height="512" role="img" aria-label="Área do jogo da cobrinha"></canvas>
+    <div class="painel-toque">
+        <div class="controles" role="group" aria-label="Controles na tela">
+            <button type="button" class="seta cima" data-direcao="cima" aria-label="Cima">▲</button>
+            <button type="button" class="seta esquerda" data-direcao="esquerda" aria-label="Esquerda">◀</button>
+            <button type="button" class="seta baixo" data-direcao="baixo" aria-label="Baixo">▼</button>
+            <button type="button" class="seta direita" data-direcao="direita" aria-label="Direita">▶</button>
+        </div>
+        <button type="button" id="botao-acao" class="acao">Começar</button>
+    </div>
+    <p class="ajuda">Desvie das pedras cinzas · Setas ou WASD para mover · Espaço pausa · No celular, use os botões ou deslize na tela</p>
+    <section class="ranking" aria-labelledby="titulo-ranking">
+        <h2 id="titulo-ranking">Ranking</h2>
+        <p class="regra">Vale a melhor partida de cada jogador: mais pontos primeiro e, no empate, menor tempo.</p>
+        <p class="origem" id="origem-ranking" role="status">Ranking salvo só neste navegador.</p>
+        <div class="tabela-rolagem">
+            <table>
+                <thead>
+                    <tr><th scope="col">#</th><th scope="col">Jogador</th><th scope="col">Pontos</th><th scope="col">Tempo</th></tr>
+                </thead>
+                <tbody id="ranking-corpo"></tbody>
+            </table>
+        </div>
+    </section>
+    <footer class="rodape">
+        Desenvolvido por Valmário Lopes |
+        <a href="https://www.linkedin.com/in/valmariolopes" target="_blank" rel="noopener noreferrer">LinkedIn</a> |
+        <a href="https://github.com/Valmario" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </footer>
 </body>
 </html>
