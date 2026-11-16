@@ -20,6 +20,15 @@
             <button type="submit" id="botao-adicionar" class="adicionar">Adicionar</button>
         </div>
     </form>
+    <fieldset class="nivel">
+        <legend>Nível</legend>
+        <div class="opcoes-nivel">
+            <label class="opcao-nivel"><input type="radio" name="nivel" value="easy"><span>Easy</span></label>
+            <label class="opcao-nivel"><input type="radio" name="nivel" value="average"><span>Average</span></label>
+            <label class="opcao-nivel"><input type="radio" name="nivel" value="hard"><span>Hard</span></label>
+        </div>
+        <p class="descricao-nivel" id="descricao-nivel"></p>
+    </fieldset>
     <p class="placar">Pontos: <strong id="pontos">0</strong> · Tempo: <strong id="tempo">0:00,0</strong> · Recorde: <strong id="recorde">0</strong></p>
     <canvas id="snake" width="512" height="512" role="img" aria-label="Área do jogo da cobrinha"></canvas>
     <div class="painel-toque">
@@ -31,10 +40,10 @@
         </div>
         <button type="button" id="botao-acao" class="acao">Começar</button>
     </div>
-    <p class="ajuda">Desvie das pedras cinzas · Setas ou WASD para mover · Espaço pausa · No celular, use os botões ou deslize na tela</p>
+    <p class="ajuda">Setas ou WASD para mover · Espaço pausa · No celular, use os botões ou deslize na tela. Desvie das pedras cinzas e, no Hard, das paredes vermelhas.</p>
     <section class="ranking" aria-labelledby="titulo-ranking">
-        <h2 id="titulo-ranking">Ranking</h2>
-        <p class="regra">Vale a melhor partida de cada jogador: mais pontos primeiro e, no empate, menor tempo.</p>
+        <h2 id="titulo-ranking">Ranking · <span id="rotulo-ranking">Average</span></h2>
+        <p class="regra">Um ranking para cada nível. Vale a melhor partida de cada jogador: mais pontos primeiro e, no empate, menor tempo.</p>
         <p class="origem" id="origem-ranking" role="status">Ranking salvo só neste navegador.</p>
         <div class="tabela-rolagem">
             <table>
