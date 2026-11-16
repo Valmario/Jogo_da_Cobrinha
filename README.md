@@ -8,6 +8,7 @@ Jogo da cobrinha em HTML, CSS e JavaScript puro, sem bibliotecas. Três níveis 
 
 ![Jogo da cobrinha em ação](demonstracao.gif)
 
+
 ## Como jogar
 
 Abra o `index.html` no navegador.
