@@ -1,4 +1,3 @@
-
 // Jogo da Cobrinha
 // A lógica (estado e regras) fica separada do desenho: isso facilita entender e testar.
 // As posições usam coordenadas de GRADE (coluna, linha), e não pixels.
@@ -10,6 +9,9 @@ const formJogador = document.getElementById("form-jogador");
 const listaJogadores = document.getElementById("lista-jogadores");
 const campoNome = document.getElementById("novo-jogador");
 const botaoAdicionar = document.getElementById("botao-adicionar");
+const radiosNivel = document.querySelectorAll('input[name="nivel"]');
+const elDescricaoNivel = document.getElementById("descricao-nivel");
+const elRotuloRanking = document.getElementById("rotulo-ranking");
 const corpoRanking = document.getElementById("ranking-corpo");
 const elOrigem = document.getElementById("origem-ranking");
 const elPontos = document.getElementById("pontos");
@@ -28,6 +30,31 @@ const OBSTACULOS_INICIAIS = 4; // pedras no começo da partida
 const COMIDAS_POR_OBSTACULO = 4; // aparece uma pedra nova a cada 4 comidas
 const OBSTACULOS_MAXIMOS = 12;
 const ZONA_SEGURA = 5; // nenhuma pedra nasce a menos de 5 casas da cabeça
+
+// Níveis. `paredes` lista as bordas em que a cobra bate; nas outras ela atravessa para o lado
+// oposto. No Hard são as quatro bordas (para só as laterais, use ["esquerda", "direita"]).
+const NIVEIS = {
+    easy: {
+        rotulo: "Easy",
+        descricao: "Sem obstáculos. A cobra atravessa as bordas da tela.",
+        obstaculos: false,
+        paredes: [],
+    },
+    average: {
+        rotulo: "Average",
+        descricao: "Com pedras no caminho. A cobra atravessa as bordas da tela.",
+        obstaculos: true,
+        paredes: [],
+    },
+    hard: {
+        rotulo: "Hard",
+        descricao: "Com pedras e com paredes nas bordas: encostou, perdeu.",
+        obstaculos: true,
+        paredes: ["cima", "baixo", "esquerda", "direita"],
+    },
+};
+const ORDEM_NIVEIS = ["easy", "average", "hard"];
+const NIVEL_PADRAO = "average";
 
 const CHAVE_DADOS = "cobrinha:jogadores";
 const TAMANHO_NOME = 16;
@@ -71,19 +98,27 @@ const COR = {
     comida: "#ffd23f",
     pedra: "#8a949f",
     pedraMiolo: "#656e78",
+    parede: "#e0613d",
     texto: "#e8f5e8",
 };
+
+const ESPESSURA_PAREDE = 6;
+
+function nivelValido(chave) {
+    return typeof chave === "string" && Object.prototype.hasOwnProperty.call(NIVEIS, chave);
+}
 
 // ---------- Estado e regras do jogo (sem nada de desenho) ----------
 
 // situacao: "aguardando" | "jogando" | "pausado" | "fim" | "vitoria"
-function novoEstado() {
+function novoEstado(nivel = nivelAtual()) {
     const cobra = [
         { x: 8, y: 8 }, // cabeça sempre na posição 0
         { x: 7, y: 8 },
         { x: 6, y: 8 },
     ];
     const estado = {
+        nivel: nivel,
         cobra: cobra,
         direcao: "direita",
         fila: [], // direções pedidas pelo jogador, aplicadas uma por passo
@@ -105,35 +140,51 @@ function ocupada(lista, x, y) {
     return lista.some((p) => p.x === x && p.y === y);
 }
 
-// Distância em casas, contando o atalho pelas bordas (a cobra atravessa a tela).
-function distancia(a, b) {
+// Casa vizinha de p na direção `nome`. Atravessa a borda para o lado oposto, a menos que
+// essa borda seja uma parede: nesse caso devolve null.
+function vizinhoDe(p, nome, paredes) {
+    const d = DIRECOES[nome];
+    const x = p.x + d.x;
+    const y = p.y + d.y;
+    if (x < 0 && paredes.includes("esquerda")) return null;
+    if (x >= COLUNAS && paredes.includes("direita")) return null;
+    if (y < 0 && paredes.includes("cima")) return null;
+    if (y >= LINHAS && paredes.includes("baixo")) return null;
+    return { x: (x + COLUNAS) % COLUNAS, y: (y + LINHAS) % LINHAS };
+}
+
+// Distância em casas. Onde a borda é livre, conta o atalho pelo outro lado da tela.
+function distancia(a, b, paredes = []) {
     const dx = Math.abs(a.x - b.x);
     const dy = Math.abs(a.y - b.y);
-    return Math.min(dx, COLUNAS - dx) + Math.min(dy, LINHAS - dy);
+    const paredeX = paredes.includes("esquerda") || paredes.includes("direita");
+    const paredeY = paredes.includes("cima") || paredes.includes("baixo");
+    return (paredeX ? dx : Math.min(dx, COLUNAS - dx)) + (paredeY ? dy : Math.min(dy, LINHAS - dy));
 }
 
 // Confere se todas as casas sem pedra continuam ligadas à origem. Assim uma pedra
 // nunca fecha um cantinho do tabuleiro e deixa a comida inalcançável.
-function tabuleiroConectado(obstaculos, origem) {
+function tabuleiroConectado(obstaculos, origem, paredes = []) {
     const chave = (x, y) => y * COLUNAS + x;
     const visitadas = new Set([chave(origem.x, origem.y)]);
     const pilha = [origem];
     while (pilha.length > 0) {
         const p = pilha.pop();
         for (const nome in DIRECOES) {
-            const x = (p.x + DIRECOES[nome].x + COLUNAS) % COLUNAS;
-            const y = (p.y + DIRECOES[nome].y + LINHAS) % LINHAS;
-            if (visitadas.has(chave(x, y)) || ocupada(obstaculos, x, y)) continue;
-            visitadas.add(chave(x, y));
-            pilha.push({ x: x, y: y });
+            const v = vizinhoDe(p, nome, paredes);
+            if (v === null || visitadas.has(chave(v.x, v.y)) || ocupada(obstaculos, v.x, v.y)) continue;
+            visitadas.add(chave(v.x, v.y));
+            pilha.push(v);
         }
     }
     return visitadas.size === COLUNAS * LINHAS - obstaculos.length;
 }
 
 // Põe uma pedra numa casa livre, longe da cabeça e sem desconectar o tabuleiro.
+// No nível Easy não há pedras.
 function adicionarObstaculo(estado) {
-    if (estado.obstaculos.length >= OBSTACULOS_MAXIMOS) return;
+    const nivel = NIVEIS[estado.nivel];
+    if (!nivel.obstaculos || estado.obstaculos.length >= OBSTACULOS_MAXIMOS) return;
 
     const cabeca = estado.cobra[0];
     const candidatas = [];
@@ -141,7 +192,7 @@ function adicionarObstaculo(estado) {
         for (let x = 0; x < COLUNAS; x++) {
             if (ocupada(estado.cobra, x, y) || ocupada(estado.obstaculos, x, y)) continue;
             if (estado.comida && estado.comida.x === x && estado.comida.y === y) continue;
-            if (distancia({ x: x, y: y }, cabeca) <= ZONA_SEGURA) continue;
+            if (distancia({ x: x, y: y }, cabeca, nivel.paredes) <= ZONA_SEGURA) continue;
             candidatas.push({ x: x, y: y });
         }
     }
@@ -149,7 +200,7 @@ function adicionarObstaculo(estado) {
     while (candidatas.length > 0) {
         const i = Math.floor(Math.random() * candidatas.length);
         const escolhida = candidatas.splice(i, 1)[0];
-        if (tabuleiroConectado(estado.obstaculos.concat([escolhida]), cabeca)) {
+        if (tabuleiroConectado(estado.obstaculos.concat([escolhida]), cabeca, nivel.paredes)) {
             estado.obstaculos.push(escolhida);
             return;
         }
@@ -182,15 +233,10 @@ function avancar(estado) {
 
     if (estado.fila.length > 0) estado.direcao = estado.fila.shift();
 
-    const d = DIRECOES[estado.direcao];
     const cabeca = estado.cobra[0];
-    const nova = {
-        // o resto da divisão faz a cobra reaparecer do outro lado da tela
-        x: (cabeca.x + d.x + COLUNAS) % COLUNAS,
-        y: (cabeca.y + d.y + LINHAS) % LINHAS,
-    };
-
-    if (ocupada(estado.obstaculos, nova.x, nova.y)) {
+    // null = bateu numa parede; senão a borda livre leva a cobra para o lado oposto da tela
+    const nova = vizinhoDe(cabeca, estado.direcao, NIVEIS[estado.nivel].paredes);
+    if (nova === null || ocupada(estado.obstaculos, nova.x, nova.y)) {
         estado.situacao = "fim";
         return;
     }
@@ -249,7 +295,7 @@ function formatarTempo(ms) {
     return minutos + ":" + (segundos < 10 ? "0" : "") + segundos.toFixed(1).replace(".", ",");
 }
 
-// ---------- Jogadores e ranking ----------
+// ---------- Jogadores e ranking (um ranking por nível) ----------
 
 function limparNome(texto) {
     return String(texto).replace(/\s+/g, " ").trim().slice(0, TAMANHO_NOME).trim();
@@ -263,47 +309,49 @@ function acharJogador(lista, nome) {
     return lista.find((j) => mesmoNome(j.nome, nome)) || null;
 }
 
-function novoJogador(nome) {
-    // melhorPontos e melhorTempoMs descrevem a MELHOR partida: mais pontos e, no empate, menos tempo
-    return { nome: nome, melhorPontos: 0, melhorTempoMs: null, partidas: 0 };
+// Estatística de um nível: a MELHOR partida (mais pontos e, no empate, menos tempo).
+function novoStats() {
+    return { melhorPontos: 0, melhorTempoMs: null, partidas: 0 };
 }
 
-// Atualiza o jogador com o resultado de uma partida e diz se bateu o próprio recorde.
+function novoJogador(nome) {
+    const niveis = {};
+    ORDEM_NIVEIS.forEach((k) => (niveis[k] = novoStats()));
+    return { nome: nome, niveis: niveis };
+}
+
+// Atualiza o nível do jogador com o resultado de uma partida e diz se bateu o próprio recorde.
 // tipo: "pontos" (mais pontos), "tempo" (mesmos pontos em menos tempo) ou null.
-function registrarResultado(jogador, pontos, tempoMs) {
+function registrarResultado(jogador, nivel, pontos, tempoMs) {
+    const s = jogador.niveis[nivel];
     let tipo = null;
-    if (pontos > jogador.melhorPontos) {
+    if (pontos > s.melhorPontos) {
         tipo = "pontos";
-    } else if (
-        pontos === jogador.melhorPontos &&
-        pontos > 0 &&
-        jogador.melhorTempoMs !== null &&
-        tempoMs < jogador.melhorTempoMs
-    ) {
+    } else if (pontos === s.melhorPontos && pontos > 0 && s.melhorTempoMs !== null && tempoMs < s.melhorTempoMs) {
         tipo = "tempo";
     }
-    if (tipo !== null || jogador.partidas === 0) {
-        jogador.melhorPontos = pontos;
-        jogador.melhorTempoMs = tempoMs;
+    if (tipo !== null || s.partidas === 0) {
+        s.melhorPontos = pontos;
+        s.melhorTempoMs = tempoMs;
     }
-    jogador.partidas++;
+    s.partidas++;
     return { tipo: tipo };
 }
 
-// Mais pontos primeiro; no empate, menor tempo; se ainda empatar, ordem alfabética.
-function ordenarRanking(lista) {
+// Ranking de um nível: mais pontos primeiro; no empate, menor tempo; depois, ordem alfabética.
+function ordenarRanking(lista, nivel) {
     return lista
-        .filter((j) => j.partidas > 0)
+        .filter((j) => j.niveis[nivel].partidas > 0)
         .sort(
             (a, b) =>
-                b.melhorPontos - a.melhorPontos ||
-                a.melhorTempoMs - b.melhorTempoMs ||
+                b.niveis[nivel].melhorPontos - a.niveis[nivel].melhorPontos ||
+                a.niveis[nivel].melhorTempoMs - b.niveis[nivel].melhorTempoMs ||
                 a.nome.localeCompare(b.nome, "pt")
         );
 }
 
-function posicaoNoRanking(lista, nome) {
-    return ordenarRanking(lista.slice()).findIndex((j) => mesmoNome(j.nome, nome)) + 1;
+function posicaoNoRanking(lista, nome, nivel) {
+    return ordenarRanking(lista.slice(), nivel).findIndex((j) => mesmoNome(j.nome, nome)) + 1;
 }
 
 // ---------- Dados guardados no navegador ----------
@@ -318,27 +366,65 @@ function limitar(n, minimo, maximo) {
     return Math.min(maximo, Math.max(minimo, n));
 }
 
+function normalizarStats(s) {
+    if (!s || typeof s !== "object") return novoStats();
+    const tempo = numeroOuNulo(s.melhorTempoMs);
+    return {
+        melhorPontos: Math.floor(limitar(Number(s.melhorPontos) || 0, 0, COLUNAS * LINHAS)),
+        melhorTempoMs: tempo === null ? null : limitar(tempo, 0, 86400000),
+        partidas: Math.floor(limitar(Number(s.partidas) || 0, 0, 1000000)),
+    };
+}
+
 // Aceita um jogador vindo do localStorage ou do banco compartilhado. Esses dados não são
 // confiáveis (qualquer um pode ter escrito neles), então tudo é limpo e limitado.
+// Formato antigo (antes dos níveis): os campos soltos valem para o nível Average, que era o
+// único jogo que existia e já tinha pedras.
 function normalizarJogador(j) {
     if (!j || typeof j !== "object" || typeof j.nome !== "string") return null;
     const nome = limparNome(j.nome);
     if (!nome) return null;
-    const tempo = numeroOuNulo(j.melhorTempoMs);
-    return {
-        nome: nome,
-        melhorPontos: Math.floor(limitar(Number(j.melhorPontos) || 0, 0, COLUNAS * LINHAS)),
-        melhorTempoMs: tempo === null ? null : limitar(tempo, 0, 86400000),
-        partidas: Math.floor(limitar(Number(j.partidas) || 0, 0, 1000000)),
-    };
+    const origem = j.niveis && typeof j.niveis === "object" ? j.niveis : { average: j };
+    const niveis = {};
+    ORDEM_NIVEIS.forEach((k) => (niveis[k] = normalizarStats(origem[k])));
+    return { nome: nome, niveis: niveis };
 }
 
-// A melhor partida de a é melhor que a de b? (mais pontos; no empate, menos tempo)
+// A melhor partida de a é melhor que a de b? (a e b são estatísticas de um nível)
 function melhorQue(a, b) {
     if (a.partidas <= 0) return false;
     if (b.partidas <= 0) return true;
     if (a.melhorPontos !== b.melhorPontos) return a.melhorPontos > b.melhorPontos;
     return (a.melhorTempoMs ?? Infinity) < (b.melhorTempoMs ?? Infinity);
+}
+
+// Junta dois registros do mesmo jogador ficando, em cada nível, com a melhor partida.
+// Assim uma cópia desatualizada nunca apaga um recorde.
+function mesclarJogador(a, b) {
+    const niveis = {};
+    ORDEM_NIVEIS.forEach((k) => {
+        const sa = a.niveis[k];
+        const sb = b.niveis[k];
+        const melhor = melhorQue(sb, sa) ? sb : sa;
+        niveis[k] = {
+            melhorPontos: melhor.melhorPontos,
+            melhorTempoMs: melhor.melhorTempoMs,
+            partidas: Math.max(sa.partidas, sb.partidas),
+        };
+    });
+    return { nome: a.nome, niveis: niveis };
+}
+
+function copiaNiveis(niveis) {
+    const copia = {};
+    ORDEM_NIVEIS.forEach((k) => {
+        copia[k] = {
+            melhorPontos: niveis[k].melhorPontos,
+            melhorTempoMs: niveis[k].melhorTempoMs,
+            partidas: niveis[k].partidas,
+        };
+    });
+    return copia;
 }
 
 // Nome do jogador -> id de documento: o banco só aceita letras minúsculas, números e
@@ -369,17 +455,24 @@ function carregarDados() {
                 if (j && !acharJogador(jogadores, j.nome)) jogadores.push(j);
             });
             const atual = typeof bruto.atual === "string" ? acharJogador(jogadores, bruto.atual) : null;
-            return { jogadores: jogadores, atual: atual ? atual.nome : null };
+            return {
+                jogadores: jogadores,
+                atual: atual ? atual.nome : null,
+                nivel: nivelValido(bruto.nivel) ? bruto.nivel : NIVEL_PADRAO,
+            };
         }
     } catch (e) {
         // dado corrompido ou localStorage bloqueado: começa do zero
     }
-    return { jogadores: [], atual: null };
+    return { jogadores: [], atual: null, nivel: NIVEL_PADRAO };
 }
 
 function salvarDados() {
     try {
-        localStorage.setItem(CHAVE_DADOS, JSON.stringify({ jogadores: dados.jogadores, atual: dados.atual }));
+        localStorage.setItem(
+            CHAVE_DADOS,
+            JSON.stringify({ jogadores: dados.jogadores, atual: dados.atual, nivel: dados.nivel })
+        );
     } catch (e) {
         // sem localStorage, os jogadores valem só até fechar a página
     }
@@ -387,6 +480,10 @@ function salvarDados() {
 
 function jogadorAtual() {
     return dados.atual ? acharJogador(dados.jogadores, dados.atual) : null;
+}
+
+function nivelAtual() {
+    return nivelValido(dados.nivel) ? dados.nivel : NIVEL_PADRAO;
 }
 
 function selecionarJogador(nome) {
@@ -406,6 +503,13 @@ function adicionarJogador(nome) {
         dados.jogadores.push(j);
     }
     selecionarJogador(j.nome);
+}
+
+function selecionarNivel(chave) {
+    if (!nivelValido(chave)) return;
+    dados.nivel = chave;
+    salvarDados();
+    reiniciar();
 }
 
 // ---------- Desenho ----------
@@ -443,19 +547,22 @@ function desenhar() {
         ctx.fillRect(p.x * CELULA + 1, p.y * CELULA + 1, CELULA - 2, CELULA - 2);
     });
 
+    desenharParedes(NIVEIS[estado.nivel].paredes);
+
+    const rotulo = NIVEIS[estado.nivel].rotulo;
     if (estado.situacao === "aguardando") {
         const j = jogadorAtual();
-        if (j) mensagem("Pronto?", j.nome + " · setas ou WASD para começar");
+        if (j) mensagem("Pronto?", j.nome + " · " + rotulo, "Setas ou WASD para começar");
         else mensagem("Quem vai jogar?", "Crie um jogador no campo acima");
     } else if (estado.situacao === "pausado") {
         mensagem("Pausado", "Espaço para continuar");
     } else if (estado.situacao === "fim" || estado.situacao === "vitoria") {
-        const linhas = ["Pontos: " + estado.pontos + " · Tempo: " + formatarTempo(estado.tempoMs)];
+        const linhas = [rotulo + " · Pontos: " + estado.pontos + " · Tempo: " + formatarTempo(estado.tempoMs)];
         if (estado.resultado) {
             const partes = [];
             if (estado.resultado.tipo === "pontos") partes.push("Novo recorde pessoal!");
             if (estado.resultado.tipo === "tempo") partes.push("Mesmo recorde em menos tempo!");
-            partes.push(estado.resultado.posicao + "º no ranking");
+            partes.push(estado.resultado.posicao + "º no ranking " + rotulo);
             linhas.push(partes.join(" · "));
         }
         if (remoto.somenteLeitura) linhas.push("Não salvo no ranking compartilhado");
@@ -465,6 +572,16 @@ function desenhar() {
 
     botaoAcao.textContent = ROTULO_ACAO[estado.situacao];
     atualizarControlesJogador();
+}
+
+// Faixa colorida ao longo de cada borda que é parede.
+function desenharParedes(paredes) {
+    if (paredes.length === 0) return;
+    ctx.fillStyle = COR.parede;
+    if (paredes.includes("cima")) ctx.fillRect(0, 0, canvas.width, ESPESSURA_PAREDE);
+    if (paredes.includes("baixo")) ctx.fillRect(0, canvas.height - ESPESSURA_PAREDE, canvas.width, ESPESSURA_PAREDE);
+    if (paredes.includes("esquerda")) ctx.fillRect(0, 0, ESPESSURA_PAREDE, canvas.height);
+    if (paredes.includes("direita")) ctx.fillRect(canvas.width - ESPESSURA_PAREDE, 0, ESPESSURA_PAREDE, canvas.height);
 }
 
 function mensagem(titulo, ...linhas) {
@@ -483,15 +600,23 @@ function atualizarPlacar() {
     const j = jogadorAtual();
     elPontos.textContent = estado.pontos;
     elTempo.textContent = formatarTempo(tempoDe(estado));
-    elRecorde.textContent = Math.max(j ? j.melhorPontos : 0, estado.pontos);
+    elRecorde.textContent = Math.max(j ? j.niveis[estado.nivel].melhorPontos : 0, estado.pontos);
 }
 
-// Trocar de jogador no meio da partida bagunçaria o ranking, então fica travado.
+// Trocar de jogador ou de nível no meio da partida bagunçaria o ranking, então fica travado.
 function atualizarControlesJogador() {
     const travado = estado.situacao === "jogando" || estado.situacao === "pausado";
     listaJogadores.disabled = travado;
     campoNome.disabled = travado;
     botaoAdicionar.disabled = travado;
+    radiosNivel.forEach((r) => (r.disabled = travado));
+}
+
+function desenharNivel() {
+    const chave = nivelAtual();
+    radiosNivel.forEach((r) => (r.checked = r.value === chave));
+    elDescricaoNivel.textContent = NIVEIS[chave].descricao;
+    elRotuloRanking.textContent = NIVEIS[chave].rotulo;
 }
 
 function desenharJogadores() {
@@ -515,23 +640,25 @@ function desenharJogadores() {
 
 function desenharRanking() {
     corpoRanking.replaceChildren();
-    const lista = ordenarRanking(dados.jogadores.slice()).slice(0, TAMANHO_RANKING);
+    const nivel = nivelAtual();
+    const lista = ordenarRanking(dados.jogadores.slice(), nivel).slice(0, TAMANHO_RANKING);
 
     if (lista.length === 0) {
         const linha = document.createElement("tr");
         const celula = document.createElement("td");
         celula.colSpan = 4;
         celula.className = "vazio";
-        celula.textContent = "Ninguém jogou ainda. Termine uma partida para entrar no ranking.";
+        celula.textContent = "Ninguém jogou o " + NIVEIS[nivel].rotulo + " ainda. Termine uma partida para entrar no ranking.";
         linha.appendChild(celula);
         corpoRanking.appendChild(linha);
         return;
     }
 
     lista.forEach((j, i) => {
+        const s = j.niveis[nivel];
         const linha = document.createElement("tr");
         if (dados.atual && mesmoNome(j.nome, dados.atual)) linha.className = "atual";
-        [i + 1, j.nome, j.melhorPontos, formatarTempo(j.melhorTempoMs)].forEach((valor) => {
+        [i + 1, j.nome, s.melhorPontos, formatarTempo(s.melhorTempoMs)].forEach((valor) => {
             const celula = document.createElement("td");
             celula.textContent = String(valor);
             linha.appendChild(celula);
@@ -545,7 +672,7 @@ function desenharRanking() {
 let estado;
 let dados = carregarDados();
 let temporizador = null;
-const remoto = { db: null, somenteLeitura: false, fila: {} };
+const remoto = { db: null, somenteLeitura: false, fila: {}, conhecidos: [] };
 
 // ---------- Ranking compartilhado (banco da página publicada) ----------
 
@@ -569,16 +696,14 @@ function atualizarTelaJogadores() {
     desenharRanking();
 }
 
-// Grava o jogador no banco, uma escrita de cada vez por documento.
+// Grava o jogador no banco, uma escrita de cada vez por documento. Antes de gravar, junta com
+// a última cópia conhecida do banco, para nunca apagar um recorde de outro nível ou aparelho.
 function enviarJogador(j) {
     if (!remoto.db || remoto.somenteLeitura) return Promise.resolve();
     const id = idDoc(j.nome);
-    const corpo = {
-        nome: j.nome,
-        melhorPontos: j.melhorPontos,
-        melhorTempoMs: j.melhorTempoMs,
-        partidas: j.partidas,
-    };
+    const conhecido = acharJogador(remoto.conhecidos, j.nome);
+    const unido = conhecido ? mesclarJogador(j, conhecido) : j;
+    const corpo = { nome: j.nome, niveis: copiaNiveis(unido.niveis) };
     const anterior = remoto.fila[id] || Promise.resolve();
     const atual = anterior.then(async () => {
         if (!remoto.db || remoto.somenteLeitura) return;
@@ -599,12 +724,12 @@ function enviarJogador(j) {
     return atual;
 }
 
-// Jogadores que já existiam só neste navegador sobem para o banco, se forem melhores.
+// Jogadores que já existiam só neste navegador sobem para o banco, se tiverem algum nível melhor.
 function migrarLocais(locais, remotos) {
     locais.forEach((l) => {
-        if (l.partidas <= 0) return;
+        if (!ORDEM_NIVEIS.some((k) => l.niveis[k].partidas > 0)) return;
         const r = acharJogador(remotos, l.nome);
-        if (!r || melhorQue(l, r)) enviarJogador(l);
+        if (!r || ORDEM_NIVEIS.some((k) => melhorQue(l.niveis[k], r.niveis[k]))) enviarJogador(l);
     });
 }
 
@@ -626,7 +751,7 @@ async function conectarBanco() {
     }
     remoto.db = db;
 
-    const locaisIniciais = dados.jogadores.map((j) => Object.assign({}, j));
+    const locaisIniciais = dados.jogadores.map((j) => ({ nome: j.nome, niveis: copiaNiveis(j.niveis) }));
     let confirmado = false;
     const espera = setTimeout(() => {
         if (!confirmado) definirOrigem("demora");
@@ -645,6 +770,7 @@ async function conectarBanco() {
                 const j = normalizarJogador(d.data());
                 if (j && !acharJogador(remotos, j.nome)) remotos.push(j);
             });
+            remoto.conhecidos = remotos;
             dados.jogadores = mesclar(remotos, dados.jogadores);
             salvarDados(); // o localStorage guarda uma cópia para quando o banco não responder
             atualizarTelaJogadores();
@@ -670,16 +796,16 @@ function agendar() {
     }
 }
 
-// Quando a partida acaba, o resultado entra no ranking do jogador atual.
+// Quando a partida acaba, o resultado entra no ranking do nível jogado, para o jogador atual.
 function finalizar() {
     if (estado.registrado) return;
     estado.registrado = true;
     pararRelogio(estado);
     const j = jogadorAtual();
     if (!j) return;
-    const r = registrarResultado(j, estado.pontos, estado.tempoMs);
+    const r = registrarResultado(j, estado.nivel, estado.pontos, estado.tempoMs);
     salvarDados();
-    estado.resultado = { tipo: r.tipo, posicao: posicaoNoRanking(dados.jogadores, j.nome) };
+    estado.resultado = { tipo: r.tipo, posicao: posicaoNoRanking(dados.jogadores, j.nome, estado.nivel) };
     desenharRanking();
     enviarJogador(j); // no banco compartilhado, quando houver
 }
@@ -695,6 +821,7 @@ function passo() {
 function reiniciar() {
     clearTimeout(temporizador);
     estado = novoEstado();
+    desenharNivel();
     desenhar();
     atualizarPlacar();
     desenharRanking();
@@ -745,10 +872,10 @@ function moverPara(direcao) {
     pedirDirecao(estado, direcao);
 }
 
-// ---------- Entradas: teclado, toque, jogadores e aba escondida ----------
+// ---------- Entradas: teclado, toque, jogadores, nível e aba escondida ----------
 
 document.addEventListener("keydown", (evento) => {
-    // digitando o nome (ou escolhendo na lista): as teclas não são do jogo
+    // digitando o nome (ou escolhendo jogador ou nível): as teclas não são do jogo
     const alvo = evento.target && evento.target.tagName;
     if (alvo === "INPUT" || alvo === "SELECT" || alvo === "TEXTAREA") return;
 
@@ -779,6 +906,14 @@ listaJogadores.addEventListener("change", () => {
     if (!listaJogadores.value) return;
     selecionarJogador(listaJogadores.value);
     listaJogadores.blur();
+});
+
+radiosNivel.forEach((radio) => {
+    radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        selecionarNivel(radio.value);
+        radio.blur(); // senão as setas continuariam mudando o nível em vez de mover a cobra
+    });
 });
 
 let toqueInicial = null;
