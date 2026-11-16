@@ -36,6 +36,86 @@ h1 {
     text-align: center;
 }
 
+/* Escolha do nível */
+.nivel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    width: min(512px, 100%);
+    text-align: center;
+}
+
+.nivel legend {
+    float: left; /* fica na mesma linha das opções, sem a quebra padrão do fieldset */
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+.opcoes-nivel {
+    display: flex;
+    justify-content: center;
+}
+
+.opcao-nivel {
+    position: relative;
+    flex: 1 1 0;
+    max-width: 170px;
+}
+
+.opcao-nivel input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0; /* o rádio continua focável pelo teclado; quem aparece é o <span> */
+    cursor: pointer;
+}
+
+.opcao-nivel span {
+    display: block;
+    padding: 10px 8px;
+    min-height: 44px;
+    text-align: center;
+    color: var(--texto);
+    background-color: #1b3321;
+    border: 2px solid var(--borda);
+    margin-left: -2px;
+}
+
+.opcao-nivel:first-child span {
+    margin-left: 0;
+    border-radius: 8px 0 0 8px;
+}
+
+.opcao-nivel:last-child span {
+    border-radius: 0 8px 8px 0;
+}
+
+.opcao-nivel input:checked + span {
+    background-color: var(--borda);
+    color: #8cf0a3;
+    font-weight: bold;
+}
+
+.opcao-nivel input:focus-visible + span {
+    outline: 2px solid #8cf0a3;
+    outline-offset: 2px;
+}
+
+.opcao-nivel input:disabled {
+    cursor: default;
+}
+
+.opcao-nivel input:disabled + span {
+    opacity: 0.5;
+}
+
+.descricao-nivel {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--texto-suave);
+}
+
 /* Escolha ou criação de jogador */
 .jogador {
     display: flex;
