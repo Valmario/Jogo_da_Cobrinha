@@ -5,15 +5,10 @@ Jogo da cobrinha em HTML, CSS e JavaScript puro, sem bibliotecas.
 
 **Jogue online:** https://valmario.github.io/Jogo_da_Cobrinha/
 
-<p align="center">
-  <img src="docs/captura-de-tela.png" alt="Captura de tela do jogo da cobrinha com pedras" width="360">
-</p>
-
 ## Demonstração
 
-![Jogo da cobrinha em ação](docs/demonstracao.gif)
+![Jogo da cobrinha em ação](demonstracao.gif)
 
-Vídeo em MP4 (clique para assistir): [docs/demonstracao.mp4](docs/demonstracao.mp4)
 
 ## Como jogar
 
