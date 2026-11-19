@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Jogo da cobrinha com pedras, jogadores, ranking e controles para celular. Feito em HTML, CSS e JavaScript puro.">
+    <meta name="description" content="Jogo da cobrinha com três níveis, pedras, jogadores, ranking e controles para celular. Feito em HTML, CSS e JavaScript puro.">
     <title>Jogo da Cobrinha</title>
     <link rel="stylesheet" href="style.css">
     <script defer src="script.js"></script>
@@ -39,6 +39,10 @@
             <button type="button" class="seta direita" data-direcao="direita" aria-label="Direita">▶</button>
         </div>
         <button type="button" id="botao-acao" class="acao">Começar</button>
+    </div>
+    <div class="botoes-som">
+        <button type="button" id="botao-som" class="som" aria-pressed="true">🔊 Som ligado</button>
+        <button type="button" id="botao-musica" class="som" aria-pressed="true">🎵 Música ligada</button>
     </div>
     <p class="ajuda">Setas ou WASD para mover · Espaço pausa · No celular, use os botões ou deslize na tela. Desvie das pedras cinzas e, no Hard, das paredes vermelhas.</p>
     <section class="ranking" aria-labelledby="titulo-ranking">
