@@ -17,6 +17,8 @@ const elOrigem = document.getElementById("origem-ranking");
 const elPontos = document.getElementById("pontos");
 const elTempo = document.getElementById("tempo");
 const elRecorde = document.getElementById("recorde");
+const botaoSom = document.getElementById("botao-som");
+const botaoMusica = document.getElementById("botao-musica");
 
 const COLUNAS = 16;
 const LINHAS = 16;
@@ -57,6 +59,8 @@ const ORDEM_NIVEIS = ["easy", "average", "hard"];
 const NIVEL_PADRAO = "average";
 
 const CHAVE_DADOS = "cobrinha:jogadores";
+const CHAVE_SOM = "cobrinha:som";
+const CHAVE_MUSICA = "cobrinha:musica";
 const TAMANHO_NOME = 16;
 const TAMANHO_RANKING = 10;
 
@@ -572,6 +576,7 @@ function desenhar() {
 
     botaoAcao.textContent = ROTULO_ACAO[estado.situacao];
     atualizarControlesJogador();
+    atualizarMusica();
 }
 
 // Faixa colorida ao longo de cada borda que é parede.
@@ -665,6 +670,222 @@ function desenharRanking() {
         });
         corpoRanking.appendChild(linha);
     });
+}
+
+// ---------- Som (gerado pelo navegador, sem arquivos de áudio) ----------
+
+// Notas: [frequência em Hz, início em s, duração em s]
+const SONS = {
+    comer: { onda: "square", volume: 0.08, notas: [[880, 0, 0.07], [1320, 0.07, 0.12]] },
+    fim: { onda: "sawtooth", volume: 0.09, notas: [[330, 0, 0.16], [247, 0.16, 0.16], [165, 0.32, 0.4]] },
+    vitoria: { onda: "triangle", volume: 0.1, notas: [[523, 0, 0.12], [659, 0.12, 0.12], [784, 0.24, 0.12], [1047, 0.36, 0.3]] },
+};
+
+// Sons em arquivo (opcional): coloque comer.mp3, gameover.mp3 e vitoria.mp3 na pasta sons/ e eles
+// passam a valer. Arquivo que não existe (ou não carrega) é ignorado e o som gerado acima é usado.
+const ARQUIVOS_SOM = { comer: "sons/comer.mp3", fim: "sons/gameover.mp3", vitoria: "sons/vitoria.mp3" };
+const arquivosProntos = {};
+
+function carregarArquivosSom() {
+    if (typeof Audio !== "function") return;
+    Object.keys(ARQUIVOS_SOM).forEach((nome) => {
+        try {
+            const a = new Audio(ARQUIVOS_SOM[nome]);
+            a.preload = "auto";
+            a.addEventListener("canplaythrough", () => (arquivosProntos[nome] = a), { once: true });
+            a.addEventListener("error", () => delete arquivosProntos[nome]);
+        } catch (e) {
+            // sem arquivo: usa o som gerado
+        }
+    });
+}
+
+function tocarArquivo(nome) {
+    const base = arquivosProntos[nome];
+    if (!base) return false;
+    try {
+        const a = base.cloneNode(); // clone: dois "dings" seguidos não se cortam
+        a.volume = 0.6;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => {});
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+let audio = null;
+let somLigado = true;
+try {
+    somLigado = localStorage.getItem(CHAVE_SOM) !== "desligado";
+} catch (e) {
+    // sem localStorage: o som começa ligado
+}
+
+// O navegador só libera o áudio depois de um toque ou tecla do jogador, por isso o contexto
+// é criado (e retomado) a partir das entradas e não na abertura da página.
+function prepararAudio() {
+    try {
+        if (!audio) {
+            const Contexto = window.AudioContext || window.webkitAudioContext;
+            if (!Contexto) return null;
+            audio = new Contexto();
+        }
+        if (audio.state === "suspended") audio.resume();
+        return audio;
+    } catch (e) {
+        return null; // sem áudio: o jogo continua normal, só que mudo
+    }
+}
+
+function tocar(nome) {
+    if (!somLigado) return;
+    if (tocarArquivo(nome)) return;
+    const ac = prepararAudio();
+    if (!ac) return;
+    try {
+        const som = SONS[nome];
+        const t0 = ac.currentTime;
+        som.notas.forEach(([freq, inicio, duracao]) => {
+            const osc = ac.createOscillator();
+            const ganho = ac.createGain();
+            osc.type = som.onda;
+            osc.frequency.value = freq;
+            ganho.gain.setValueAtTime(som.volume, t0 + inicio);
+            ganho.gain.exponentialRampToValueAtTime(0.0001, t0 + inicio + duracao); // some sem estalo
+            osc.connect(ganho);
+            ganho.connect(ac.destination);
+            osc.start(t0 + inicio);
+            osc.stop(t0 + inicio + duracao + 0.02);
+        });
+    } catch (e) {
+        // falha de áudio nunca atrapalha o jogo
+    }
+}
+
+function desenharSom() {
+    botaoSom.textContent = somLigado ? "🔊 Som ligado" : "🔇 Som desligado";
+    botaoSom.setAttribute("aria-pressed", String(somLigado));
+}
+
+function alternarSom() {
+    somLigado = !somLigado;
+    try {
+        localStorage.setItem(CHAVE_SOM, somLigado ? "ligado" : "desligado");
+    } catch (e) {
+        // vale só até fechar a página
+    }
+    desenharSom();
+    atualizarMusica(); // "Som desligado" cala também a música
+    if (somLigado) tocar("comer"); // confirma que está funcionando
+}
+
+// ---------- Música de fundo (também gerada pelo navegador) ----------
+
+// Laço de 32 passos em Lá menor. 0 = pausa. Cada passo dura PASSO_MUSICA segundos.
+const PASSO_MUSICA = 0.2;
+const MELODIA = [
+    440, 0, 523, 0, 659, 0, 523, 0, 587, 0, 523, 0, 440, 0, 392, 0,
+    440, 0, 523, 0, 659, 0, 784, 0, 659, 0, 587, 0, 523, 587, 523, 440,
+];
+const BAIXO = [110, 87.3, 98, 110, 110, 87.3, 98, 82.4]; // uma nota a cada 4 passos
+const VOLUME_MUSICA = 0.035; // bem mais baixo que os efeitos, para não cobrir o "ding"
+const ANTECEDENCIA = 0.4; // quantos segundos à frente as notas são agendadas
+
+let musicaLigada = true;
+try {
+    musicaLigada = localStorage.getItem(CHAVE_MUSICA) !== "desligada";
+} catch (e) {
+    // sem localStorage: a música começa ligada
+}
+
+const musica = { tocando: false, passo: 0, proximo: 0, temporizador: null, saida: null };
+
+function nota(ac, destino, onda, freq, inicio, duracao) {
+    const osc = ac.createOscillator();
+    const ganho = ac.createGain();
+    osc.type = onda;
+    osc.frequency.value = freq;
+    ganho.gain.setValueAtTime(0.0001, inicio);
+    ganho.gain.exponentialRampToValueAtTime(1, inicio + 0.01);
+    ganho.gain.exponentialRampToValueAtTime(0.0001, inicio + duracao);
+    osc.connect(ganho);
+    ganho.connect(destino);
+    osc.start(inicio);
+    osc.stop(inicio + duracao + 0.02);
+}
+
+// Agenda as próximas notas um pouco à frente e se chama de novo: o relógio do áudio é preciso,
+// o setTimeout não, então o setTimeout só "enche a fila" e o áudio faz o tempo.
+function agendarMusica() {
+    if (!musica.tocando) return;
+    try {
+        const ac = audio;
+        while (musica.proximo < ac.currentTime + ANTECEDENCIA) {
+            const i = musica.passo % MELODIA.length;
+            if (MELODIA[i]) nota(ac, musica.saida, "square", MELODIA[i], musica.proximo, PASSO_MUSICA * 0.9);
+            if (i % 4 === 0) nota(ac, musica.saida, "triangle", BAIXO[i / 4], musica.proximo, PASSO_MUSICA * 3.6);
+            musica.passo++;
+            musica.proximo += PASSO_MUSICA;
+        }
+    } catch (e) {
+        pararMusica(); // falha de áudio nunca atrapalha o jogo
+        return;
+    }
+    musica.temporizador = setTimeout(agendarMusica, 100);
+}
+
+function iniciarMusica() {
+    if (musica.tocando) return;
+    const ac = prepararAudio();
+    if (!ac) return;
+    try {
+        musica.saida = ac.createGain();
+        musica.saida.gain.value = VOLUME_MUSICA;
+        musica.saida.connect(ac.destination);
+        musica.tocando = true;
+        musica.proximo = ac.currentTime + 0.05;
+        agendarMusica();
+    } catch (e) {
+        musica.tocando = false;
+    }
+}
+
+function pararMusica() {
+    if (!musica.tocando) return;
+    musica.tocando = false;
+    clearTimeout(musica.temporizador);
+    try {
+        const saida = musica.saida;
+        saida.gain.setValueAtTime(saida.gain.value, audio.currentTime);
+        saida.gain.linearRampToValueAtTime(0.0001, audio.currentTime + 0.08); // corta as notas já agendadas
+        setTimeout(() => saida.disconnect(), 200);
+    } catch (e) {
+        // nada a fazer
+    }
+    musica.saida = null;
+}
+
+// Toca só enquanto a partida está rolando: pausa, Game Over e tela inicial ficam em silêncio.
+function atualizarMusica() {
+    if (musicaLigada && somLigado && estado.situacao === "jogando") iniciarMusica();
+    else pararMusica();
+}
+
+function desenharMusica() {
+    botaoMusica.textContent = musicaLigada ? "🎵 Música ligada" : "🎵 Música desligada";
+    botaoMusica.setAttribute("aria-pressed", String(musicaLigada));
+}
+
+function alternarMusica() {
+    musicaLigada = !musicaLigada;
+    try {
+        localStorage.setItem(CHAVE_MUSICA, musicaLigada ? "ligada" : "desligada");
+    } catch (e) {
+        // vale só até fechar a página
+    }
+    desenharMusica();
+    atualizarMusica();
 }
 
 // ---------- Controle do jogo ----------
@@ -811,7 +1032,11 @@ function finalizar() {
 }
 
 function passo() {
+    const pontosAntes = estado.pontos;
     avancar(estado);
+    if (estado.situacao === "fim") tocar("fim");
+    else if (estado.situacao === "vitoria") tocar("vitoria");
+    else if (estado.pontos > pontosAntes) tocar("comer");
     if (estado.situacao === "fim" || estado.situacao === "vitoria") finalizar();
     desenhar();
     atualizarPlacar();
@@ -875,6 +1100,7 @@ function moverPara(direcao) {
 // ---------- Entradas: teclado, toque, jogadores, nível e aba escondida ----------
 
 document.addEventListener("keydown", (evento) => {
+    prepararAudio(); // a primeira tecla libera o som no navegador
     // digitando o nome (ou escolhendo jogador ou nível): as teclas não são do jogo
     const alvo = evento.target && evento.target.tagName;
     if (alvo === "INPUT" || alvo === "SELECT" || alvo === "TEXTAREA") return;
@@ -910,9 +1136,13 @@ listaJogadores.addEventListener("change", () => {
 
 radiosNivel.forEach((radio) => {
     radio.addEventListener("change", () => {
-        if (!radio.checked) return;
-        selecionarNivel(radio.value);
-        radio.blur(); // senão as setas continuariam mudando o nível em vez de mover a cobra
+        if (radio.checked) selecionarNivel(radio.value);
+    });
+    // Depois de clicar (ou tocar), devolve as setas ao jogo: com o foco no rádio elas mudariam o
+    // nível em vez de mover a cobra. Vale também ao clicar no nível que já estava marcado.
+    // Pelo teclado (detail 0) o foco fica, para dar para navegar entre os níveis com as setas.
+    radio.addEventListener("click", (evento) => {
+        if (evento.detail > 0) radio.blur();
     });
 });
 
@@ -951,6 +1181,9 @@ document.querySelectorAll("[data-direcao]").forEach((botao) => {
     });
 });
 
+botaoSom.addEventListener("click", alternarSom);
+botaoMusica.addEventListener("click", alternarMusica);
+
 botaoAcao.addEventListener("pointerdown", (evento) => {
     evento.preventDefault();
     acaoPrincipal();
@@ -961,6 +1194,9 @@ document.addEventListener("visibilitychange", () => {
     if (document.hidden && estado.situacao === "jogando") alternarPausa();
 });
 
+carregarArquivosSom();
+desenharSom();
+desenharMusica();
 desenharJogadores();
 reiniciar();
 conectarBanco();
