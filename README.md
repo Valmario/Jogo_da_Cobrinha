@@ -4,10 +4,15 @@ Jogo da cobrinha em HTML, CSS e JavaScript puro, sem bibliotecas. Três níveis 
 
 **Jogue online:** https://valmario.github.io/Jogo_da_Cobrinha/
 
+<p align="center">
+  <img src="docs/captura-de-tela.png" alt="Captura de tela do jogo da cobrinha no nível Hard, com pedras e paredes" width="320">
+</p>
+
 ## Demonstração
 
-![Jogo da cobrinha em ação](demonstracao.gif)
+![Jogo da cobrinha em ação](docs/demonstracao.gif)
 
+Vídeo em MP4 (clique para assistir): [docs/demonstracao.mp4](docs/demonstracao.mp4)
 
 ## Como jogar
 
@@ -22,6 +27,9 @@ Os botões na tela só aparecem em telas de toque ou janelas estreitas.
 
 - Coma as bolinhas amarelas para crescer e ganhar pontos.
 - Bater no próprio corpo termina o jogo. A cobra acelera a cada comida.
+- **Som:** um "ding" ao comer e um som grave no Game Over (e uma melodia se você preencher o tabuleiro). Os sons são gerados pelo navegador (Web Audio), sem arquivos de áudio. O botão **Som ligado/desligado** abaixo dos controles liga e desliga, e a escolha fica guardada no navegador. O som só começa depois da primeira tecla ou toque, regra dos navegadores.
+  - **Música de fundo:** um laço em estilo 8-bit toca enquanto a partida está rolando e silencia na pausa, no Game Over e na tela inicial. Ela também é gerada pelo navegador, tem botão próprio (**Música ligada/desligada**, guardado no navegador) e o botão **Som** desligado cala tudo. Para trocar a melodia, edite `MELODIA` e `BAIXO` no `script.js`.
+  - **Sons próprios (opcional):** ponha `comer.mp3`, `gameover.mp3` e/ou `vitoria.mp3` na pasta `sons/` e o jogo usa esses arquivos no lugar dos gerados. O que não existir continua com o som gerado. Use só sons seus ou livres (CC0) e confira a licença.
 
 ## Níveis
 
