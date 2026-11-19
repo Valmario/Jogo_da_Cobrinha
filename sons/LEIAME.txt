@@ -1,0 +1,8 @@
+Sons opcionais do jogo. Coloque aqui, com estes nomes exatos:
+
+  comer.mp3     toca ao comer a bolinha (curto, menos de 1 segundo)
+  gameover.mp3  toca no Game Over
+  vitoria.mp3   toca ao vencer (preencher o tabuleiro)
+
+Arquivo que não existir é ignorado: o jogo usa o som gerado pelo navegador.
+Use só sons seus ou livres (CC0 / domínio público) e confira a licença antes de publicar.
