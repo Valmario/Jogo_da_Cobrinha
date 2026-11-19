@@ -320,6 +320,30 @@ h1 {
     background-color: var(--borda);
 }
 
+.botoes-som {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
+.som {
+    min-height: 40px;
+    padding: 0 16px;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--texto);
+    background-color: #1b3321;
+    border: 2px solid var(--borda);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.som:hover,
+.som:active {
+    background-color: var(--borda);
+}
+
 .rodape {
     margin-top: 8px;
     font-size: 0.85rem;
